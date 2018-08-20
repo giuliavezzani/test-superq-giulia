@@ -196,12 +196,16 @@ class Finder : public RFModule
     unsigned int trials;
     bool test_derivative;
     double inside_penalty;
+    bool visualize;
 
     vector<Vector> all_points,in_points,out_points,dwn_points;
     vector<vector<unsigned char>> all_colors;
 
     vector<Vector> fin_diff_solutions;
     vector<Vector> analytic_solutions;
+
+    vector<double> times_analytic;
+    vector<double> times_fin_diff;
     
     unique_ptr<Points> vtk_all_points,vtk_out_points,vtk_dwn_points;
     
@@ -266,7 +270,7 @@ class Finder : public RFModule
     }
 
     /****************************************************************/
-    Vector findSuperquadric() const
+    Vector findSuperquadric()
     {
         Ipopt::SmartPtr<Ipopt::IpoptApplication> app=new Ipopt::IpoptApplication;
         app->Options()->SetNumericValue("tol",1e-6);
@@ -284,13 +288,15 @@ class Finder : public RFModule
         double t1=Time::now();
 
         Vector r=nlp->get_result();
-        double final_error=nlp->final_cost;
-        yDebug()<<"OBJ VALUE ANALYTIC "<<final_error;
+        yDebug()<<"Error computed only with z angle: "<<nlp->final_cost;
+
         yInfo()<<"center   = ("<<r.subVector(0,2).toString(3,3)<<")";
         yInfo()<<"angle    ="<<r[3]<<"[deg]";
         yInfo()<<"size     = ("<<r.subVector(4,6).toString(3,3)<<")";
         yInfo()<<"shape    = ("<<r.subVector(7,8).toString(3,3)<<")";
         yInfo()<<"found in ="<<t1-t0<<"[s]";
+
+        times_analytic.push_back(t1-t0);
 
         Vector rot(4,0.0);
         rot[2]=1.0; rot[3]=(M_PI/180.0)*r[3];
@@ -346,23 +352,24 @@ class Finder : public RFModule
     }
 
     /****************************************************************/
-    void computeStatistics(vector<Vector> &solutions)
+    void computeStatistics(vector<Vector> &solutions, vector<double> &times)
     {
         double error_mean=0.0;
         double error_std=0.0;
+        double time_mean=0.0;
+        double time_std=0.0;
         vector<double> errors;
 
         for (auto &i:solutions)
         {
-            yDebug()<<"Superq "<<i.toString();
             errors.push_back(superqPointsDistance(i));
-
         }
 
-        for (auto &i:errors)
-            yDebug()<<"Errors "<<i;
+        //for (auto &i:errors)
+        //    yDebug()<<"Errors "<<i;
 
         error_mean = accumulate(errors.begin(), errors.end(), 0.0) / errors.size();
+        time_mean = accumulate(times.begin(), times.end(), 0.0) / times.size();
         for (auto &i:errors)
         {
             double diff = i - error_mean;
@@ -371,8 +378,20 @@ class Finder : public RFModule
 
         error_std = sqrt(error_std/errors.size());
 
-        yInfo()<<"Mean: "<<error_mean;
-        yInfo()<<"Deviation: "<<error_std;
+        for (auto &t:times)
+        {
+            double diff = t - time_mean;
+            time_std += diff * diff;
+        }
+
+        time_std = sqrt(time_std/errors.size());
+
+        yInfo()<<"     Average error: "<<error_mean;
+        yInfo()<<"     Standard deviation: "<<error_std;
+
+        yInfo()<<"     Average time: "<<time_mean;
+        yInfo()<<"     Standard deviation: "<<time_std;
+
 
     }
 
@@ -476,6 +495,7 @@ class Finder : public RFModule
         inside_penalty=rf.check("inside-penalty",Value(100.0)).asDouble();
         trials=(unsigned int)rf.check("trials",Value(1)).asInt();
         test_derivative=rf.check("test-derivative");
+        visualize=rf.check("visualize", Value(1)).asBool();
 
         removeOutliers();
 
@@ -513,7 +533,6 @@ class Finder : public RFModule
                 while (true)
                 {
                     Property *iProp=iPort.read();
-                    yInfo()<<"received property:"<<iProp->toString();
 
                     Vector v;
                     r_finitediff.clear();
@@ -550,7 +569,7 @@ class Finder : public RFModule
                 cmd.addString("get_superq");
                 superqRpc.write(cmd, superq_b);
 
-                yInfo()<<"Received superquadric: "<<superq_b.toString();
+
 
 
                 Vector v;
@@ -558,19 +577,42 @@ class Finder : public RFModule
                 r_finitediff.resize(12,0.0);
                 Vector orient = dcm2euler(axis2dcm(v.subVector(8,11)));
 
-                //yInfo()<<"Received superquadric: "<<orient.toString();
                 r_finitediff.setSubvector(0, v.subVector(5,7));
                 r_finitediff.setSubvector(3, v.subVector(8,11));
                 r_finitediff.setSubvector(7, v.subVector(0,2));
                 r_finitediff.setSubvector(10, v.subVector(3,4));
-                //r_finitediff[6] = - r_finitediff[6];
+
 
                 yInfo()<<"Read superquadric: "<<r_finitediff.toString();
                 fin_diff_solutions.push_back(r_finitediff);
 
+                cmd.clear();
+                cmd.addString("get_options");
+                cmd.addString("statistics");
+                Bottle stats;
+                superqRpc.write(cmd, stats);
+
+                Bottle *all=stats.get(0).asList();
+
+                for (size_t i=0; i<all->size(); i++)
+                {
+                    Bottle *group=all->get(i).asList();
+                    if (group->get(0).asString() == "average_computation_time")
+                    {
+                         times_fin_diff.push_back(group->get(1).asDouble());
+
+
+                    }
+                }
+                yInfo()<<"Received superquadric: "<<times_fin_diff;
+
             }
 
-            yInfo()<<"final superquadric_finitediff parameters:"<<r_finitediff.toString(3,3);
+            yInfo()<<"Superquadric computed with finite difference: ";
+            yInfo()<<"center "<<r_finitediff.subVector(0,2).toString(3,3);
+            yInfo()<<"orientation "<<r_finitediff.subVector(3,6).toString(3,3);
+            yInfo()<<"dimensions "<<r_finitediff.subVector(7,9).toString(3,3);
+            yInfo()<<"shape "<<r_finitediff.subVector(10,11).toString(3,3);
             unique_ptr<Superquadric> vtk_superquadric_finitediff=unique_ptr<Superquadric>(new Superquadric(r_finitediff,2.0));
 
             Vector r_analytic=findSuperquadric();
@@ -616,13 +658,15 @@ class Finder : public RFModule
             vtkSmartPointer<vtkInteractorStyleSwitch> vtk_style=vtkSmartPointer<vtkInteractorStyleSwitch>::New();
             vtk_style->SetCurrentStyleToTrackballCamera();
             vtk_renderWindowInteractor->SetInteractorStyle(vtk_style);
-            vtk_renderWindowInteractor->Start();
+
+            if (visualize)
+                vtk_renderWindowInteractor->Start();
         }
 
         yInfo()<<"Statistics for finite difference solutions";
-        computeStatistics(fin_diff_solutions);
+        computeStatistics(fin_diff_solutions, times_fin_diff);
         yInfo()<<"Statistics for analytic solutions";
-        computeStatistics(analytic_solutions);
+        computeStatistics(analytic_solutions, times_analytic);
 
         
         return true;
