@@ -14,12 +14,14 @@
 #include <limits>
 
 #include <yarp/math/Math.h>
+#include <yarp/os/all.h>
 
 #include "nlp.h"
 
 using namespace std;
 using namespace yarp::sig;
 using namespace yarp::math;
+
 
 /****************************************************************/
 bool SuperQuadricNLP::get_nlp_info(Ipopt::Index &n, Ipopt::Index &m,
@@ -75,6 +77,11 @@ bool SuperQuadricNLP::get_starting_point(Ipopt::Index n, bool init_x,
     x[6]=0.5*(bounds(2,1)-bounds(2,0));
     x[7]=1.0;
     x[8]=1.0;
+
+
+
+    yInfo()<<"Initial x0"<<x[0]<<x[1]<<x[2]<<x[3]<<x[4]<<x[5]<<x[6]<<x[7]<<x[8];
+
     return true;
 }
 

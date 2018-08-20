@@ -1,7 +1,0 @@
-/home/gvezzani/Desktop/PhD/Anno_3/ugo-superq/test-superquadric/build/CMakeFiles/install.dir
-/home/gvezzani/Desktop/PhD/Anno_3/ugo-superq/test-superquadric/build/CMakeFiles/list_install_components.dir
-/home/gvezzani/Desktop/PhD/Anno_3/ugo-superq/test-superquadric/build/CMakeFiles/rebuild_cache.dir
-/home/gvezzani/Desktop/PhD/Anno_3/ugo-superq/test-superquadric/build/CMakeFiles/install/strip.dir
-/home/gvezzani/Desktop/PhD/Anno_3/ugo-superq/test-superquadric/build/CMakeFiles/install/local.dir
-/home/gvezzani/Desktop/PhD/Anno_3/ugo-superq/test-superquadric/build/CMakeFiles/test-superquadric.dir
-/home/gvezzani/Desktop/PhD/Anno_3/ugo-superq/test-superquadric/build/CMakeFiles/edit_cache.dir
