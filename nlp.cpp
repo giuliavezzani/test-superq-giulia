@@ -118,7 +118,10 @@ bool SuperQuadricNLP::eval_f(Ipopt::Index n, const Ipopt::Number *x,
         double penalty=(F1<0.0?inside_penalty:1.0);
         obj_value+=F1*F1*penalty;
     }
-    obj_value*=(s[0]*s[1]*s[2])/points.size();
+
+    final_cost = obj_value/points.size();
+
+    obj_value*=(s[0]*s[1]*s[2])/points.size(); 
 
     return true;
 }

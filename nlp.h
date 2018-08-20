@@ -24,6 +24,9 @@
 /****************************************************************/
 class SuperQuadricNLP : public Ipopt::TNLP
 {
+public:
+    double final_cost;
+
 protected:
     const std::vector<yarp::sig::Vector> &points;
     double inside_penalty;

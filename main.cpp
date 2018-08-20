@@ -49,6 +49,7 @@
 
 using namespace std;
 using namespace yarp::os;
+using namespace yarp::os;
 using namespace yarp::sig;
 using namespace yarp::math;
 
@@ -181,6 +182,7 @@ public:
         vtk_transform=vtkSmartPointer<vtkTransform>::New();
         vtk_transform->Translate(r.subVector(0,2).data());
         vtk_transform->RotateWXYZ((180.0/M_PI)*r[6],r.subVector(3,5).data());
+        //vtk_transform->RotateZ((180.0/M_PI)*r[6]);
         vtk_actor->SetUserTransform(vtk_transform);
     }
 };
@@ -191,11 +193,15 @@ class Finder : public RFModule
 {
     Bottle outliersRemovalOptions;
     unsigned int sample;
+    unsigned int trials;
     bool test_derivative;
     double inside_penalty;
 
     vector<Vector> all_points,in_points,out_points,dwn_points;
     vector<vector<unsigned char>> all_colors;
+
+    vector<Vector> fin_diff_solutions;
+    vector<Vector> analytic_solutions;
     
     unique_ptr<Points> vtk_all_points,vtk_out_points,vtk_dwn_points;
     
@@ -243,6 +249,8 @@ class Finder : public RFModule
     /****************************************************************/
     void sampleInliers()
     {
+        dwn_points.clear();
+
         set<unsigned int> idx;
         while (idx.size()<sample)
         {
@@ -276,6 +284,8 @@ class Finder : public RFModule
         double t1=Time::now();
 
         Vector r=nlp->get_result();
+        double final_error=nlp->final_cost;
+        yDebug()<<"OBJ VALUE ANALYTIC "<<final_error;
         yInfo()<<"center   = ("<<r.subVector(0,2).toString(3,3)<<")";
         yInfo()<<"angle    ="<<r[3]<<"[deg]";
         yInfo()<<"size     = ("<<r.subVector(4,6).toString(3,3)<<")";
@@ -333,6 +343,62 @@ class Finder : public RFModule
 
 
         return superq_aux;
+    }
+
+    /****************************************************************/
+    void computeStatistics(vector<Vector> &solutions)
+    {
+        double error_mean=0.0;
+        double error_std=0.0;
+        vector<double> errors;
+
+        for (auto &i:solutions)
+        {
+            yDebug()<<"Superq "<<i.toString();
+            errors.push_back(superqPointsDistance(i));
+
+        }
+
+        for (auto &i:errors)
+            yDebug()<<"Errors "<<i;
+
+        error_mean = accumulate(errors.begin(), errors.end(), 0.0) / errors.size();
+        for (auto &i:errors)
+        {
+            double diff = i - error_mean;
+            error_std += diff * diff;
+        }
+
+        error_std = sqrt(error_std/errors.size());
+
+        yInfo()<<"Mean: "<<error_mean;
+        yInfo()<<"Deviation: "<<error_std;
+
+    }
+
+    /****************************************************************/
+    double superqPointsDistance(Vector &x)
+    {
+
+        Matrix R=axis2dcm(x.subVector(3,6));
+
+        R = R.transposed();
+
+        double value=0.0;
+
+        for(auto &point_cloud:dwn_points)
+        {
+            double num1 = R(0, 0)*point_cloud[0] + R(0, 1)*point_cloud[1] + R(0, 2)*point_cloud[2] - x[0] * R(0, 0) - x[1] * R(0, 1) - x[2] * R(0, 2);
+            double num2 = R(1, 0)*point_cloud[0] + R(1, 1)*point_cloud[1] + R(1, 2)*point_cloud[2] - x[0] * R(1, 0) - x[1] * R(1, 1) - x[2] * R(1, 2);
+            double num3 = R(2, 0)*point_cloud[0] + R(2, 1)*point_cloud[1] + R(2, 2)*point_cloud[2] - x[0] * R(2, 0) - x[1] * R(2, 1) - x[2] * R(2, 2);
+            double tmp = pow(abs(num1 / x[7]), 2.0 / x[11]) + pow(abs(num2 / x[8]), 2.0 / x[11]);
+            tmp = pow(abs(tmp), x[11] / x[10]) + pow(abs(num3 / x[9]), (2.0 / x[10]));
+            tmp = pow(tmp,x[10])-1;
+            value+=tmp*tmp;
+        }
+
+        return value/=dwn_points.size();
+
     }
 
     /****************************************************************/
@@ -408,139 +474,156 @@ class Finder : public RFModule
 
         sample=(unsigned int)rf.check("sample",Value(50)).asInt();
         inside_penalty=rf.check("inside-penalty",Value(100.0)).asDouble();
+        trials=(unsigned int)rf.check("trials",Value(1)).asInt();
         test_derivative=rf.check("test-derivative");
 
         removeOutliers();
-        sampleInliers();
 
-        vtk_all_points=unique_ptr<Points>(new Points(all_points,2));
-        vtk_out_points=unique_ptr<Points>(new Points(out_points,4));
-        vtk_dwn_points=unique_ptr<Points>(new Points(dwn_points,1));
+        // Compute several superquadrics for statistics
 
-        vtk_all_points->set_colors(all_colors);
-        vtk_out_points->get_actor()->GetProperty()->SetColor(1.0,0.0,0.0);
-        vtk_dwn_points->get_actor()->GetProperty()->SetColor(1.0,1.0,0.0);
-
-        Bottle &oBottle=oPort.prepare();
-        oBottle.clear();
-        Bottle &payLoad=oBottle.addList();
-
-
-
-        Vector r_finitediff;
-        if (streaming_mode)
+        for (auto t=0; t < trials; t++)
         {
-            for (auto &p:dwn_points)
-            {
-                Bottle &b=payLoad.addList();
-                b.read(p);
-            }
-            oPort.writeStrict();
+            sampleInliers();
 
-            while (true)
+
+            vtk_all_points=unique_ptr<Points>(new Points(all_points,2));
+            vtk_out_points=unique_ptr<Points>(new Points(out_points,4));
+            vtk_dwn_points=unique_ptr<Points>(new Points(dwn_points,1));
+
+            vtk_all_points->set_colors(all_colors);
+            vtk_out_points->get_actor()->GetProperty()->SetColor(1.0,0.0,0.0);
+            vtk_dwn_points->get_actor()->GetProperty()->SetColor(1.0,1.0,0.0);
+
+            Bottle &oBottle=oPort.prepare();
+            oBottle.clear();
+            Bottle &payLoad=oBottle.addList();
+
+
+
+            Vector r_finitediff;
+            if (streaming_mode)
             {
-                Property *iProp=iPort.read();
-                yInfo()<<"received property:"<<iProp->toString();
+                for (auto &p:dwn_points)
+                {
+                    Bottle &b=payLoad.addList();
+                    b.read(p);
+                }
+                oPort.writeStrict();
+
+                while (true)
+                {
+                    Property *iProp=iPort.read();
+                    yInfo()<<"received property:"<<iProp->toString();
+
+                    Vector v;
+                    r_finitediff.clear();
+                    iProp->find("center").asList()->write(v); r_finitediff=cat(r_finitediff,v);
+                    iProp->find("orientation").asList()->write(v); r_finitediff=cat(r_finitediff,v);
+                    iProp->find("dimensions").asList()->write(v); r_finitediff=cat(r_finitediff,v);
+                    iProp->find("exponents").asList()->write(v); r_finitediff=cat(r_finitediff,v);
+
+                    if (norm(r_finitediff.subVector(7,9))>0.0)
+                        break;
+                }
+            }
+            else
+            {
+                Bottle cmd, superq_b;
+                cmd.addString("send_point_clouds");
+
+                Bottle &in1=cmd.addList();
+
+                for (size_t i=0; i<dwn_points.size(); i++)
+                {
+                    Bottle &in=in1.addList();
+                    in.addDouble(dwn_points[i][0]);
+                    in.addDouble(dwn_points[i][1]);
+                    in.addDouble(dwn_points[i][2]);
+                    in.addDouble(dwn_points[i][3]);
+                    in.addDouble(dwn_points[i][4]);
+                    in.addDouble(dwn_points[i][5]);
+                }
+
+                superqRpc.write(cmd, superq_b);
+
+                cmd.clear();
+                cmd.addString("get_superq");
+                superqRpc.write(cmd, superq_b);
+
+                yInfo()<<"Received superquadric: "<<superq_b.toString();
+
 
                 Vector v;
-                r_finitediff.clear();
-                iProp->find("center").asList()->write(v); r_finitediff=cat(r_finitediff,v);
-                iProp->find("orientation").asList()->write(v); r_finitediff=cat(r_finitediff,v);
-                iProp->find("dimensions").asList()->write(v); r_finitediff=cat(r_finitediff,v);
-                iProp->find("exponents").asList()->write(v); r_finitediff=cat(r_finitediff,v);
+                v = getBottle(superq_b);
+                r_finitediff.resize(12,0.0);
+                Vector orient = dcm2euler(axis2dcm(v.subVector(8,11)));
 
-                if (norm(r_finitediff.subVector(7,9))>0.0)
-                    break;
-            }
-        }
-        else
-        {
-            Bottle cmd, superq_b;
-            cmd.addString("send_point_clouds");
+                //yInfo()<<"Received superquadric: "<<orient.toString();
+                r_finitediff.setSubvector(0, v.subVector(5,7));
+                r_finitediff.setSubvector(3, v.subVector(8,11));
+                r_finitediff.setSubvector(7, v.subVector(0,2));
+                r_finitediff.setSubvector(10, v.subVector(3,4));
+                //r_finitediff[6] = - r_finitediff[6];
 
-            Bottle &in1=cmd.addList();
+                yInfo()<<"Read superquadric: "<<r_finitediff.toString();
+                fin_diff_solutions.push_back(r_finitediff);
 
-            for (size_t i=0; i<dwn_points.size(); i++)
-            {
-                Bottle &in=in1.addList();
-                in.addDouble(dwn_points[i][0]);
-                in.addDouble(dwn_points[i][1]);
-                in.addDouble(dwn_points[i][2]);
-                in.addDouble(dwn_points[i][3]);
-                in.addDouble(dwn_points[i][4]);
-                in.addDouble(dwn_points[i][5]);
             }
 
-            superqRpc.write(cmd, superq_b);
+            yInfo()<<"final superquadric_finitediff parameters:"<<r_finitediff.toString(3,3);
+            unique_ptr<Superquadric> vtk_superquadric_finitediff=unique_ptr<Superquadric>(new Superquadric(r_finitediff,2.0));
 
-            cmd.clear();
-            cmd.addString("get_superq");
-            superqRpc.write(cmd, superq_b);
+            Vector r_analytic=findSuperquadric();
+            unique_ptr<Superquadric> vtk_superquadric_analytic=unique_ptr<Superquadric>(new Superquadric(r_analytic,1.2));
 
-            yInfo()<<"Received superquadric: "<<superq_b.toString();
+            analytic_solutions.push_back(r_analytic);
 
+            vtkSmartPointer<vtkRenderer> vtk_renderer=vtkSmartPointer<vtkRenderer>::New();
+            vtkSmartPointer<vtkRenderWindow> vtk_renderWindow=vtkSmartPointer<vtkRenderWindow>::New();
+            vtk_renderWindow->SetSize(300,300);
+            vtk_renderWindow->AddRenderer(vtk_renderer);
+            vtkSmartPointer<vtkRenderWindowInteractor> vtk_renderWindowInteractor=vtkSmartPointer<vtkRenderWindowInteractor>::New();
+            vtk_renderWindowInteractor->SetRenderWindow(vtk_renderWindow);
 
-            Vector v;
-            v = getBottle(superq_b);
-            r_finitediff.resize(12,0.0);
-            Vector orient = dcm2euler(axis2dcm(v.subVector(8,11)));
+            vtk_renderer->AddActor(vtk_all_points->get_actor());
+            vtk_renderer->AddActor(vtk_out_points->get_actor());
+            if (dwn_points.size()!=in_points.size())
+                vtk_renderer->AddActor(vtk_dwn_points->get_actor());
+            vtk_renderer->AddActor(vtk_superquadric_analytic->get_actor());
+            vtk_renderer->AddActor(vtk_superquadric_finitediff->get_actor());
+            vtk_renderer->SetBackground(0.1,0.2,0.2);
 
-            //yInfo()<<"Received superquadric: "<<orient.toString();
-            r_finitediff.setSubvector(0, v.subVector(5,7));
-            r_finitediff.setSubvector(3, v.subVector(8,11));
-            r_finitediff.setSubvector(7, v.subVector(0,2));
-            r_finitediff.setSubvector(10, v.subVector(3,4));
-            r_finitediff[6] = - r_finitediff[6];
+            vtkSmartPointer<vtkAxesActor> vtk_axes=vtkSmartPointer<vtkAxesActor>::New();
+            vtkSmartPointer<vtkOrientationMarkerWidget> vtk_widget=vtkSmartPointer<vtkOrientationMarkerWidget>::New();
+            vtk_widget->SetOutlineColor(0.9300,0.5700,0.1300);
+            vtk_widget->SetOrientationMarker(vtk_axes);
+            vtk_widget->SetInteractor(vtk_renderWindowInteractor);
+            vtk_widget->SetViewport(0.0,0.0,0.2,0.2);
+            vtk_widget->SetEnabled(1);
+            vtk_widget->InteractiveOn();
 
-            yInfo()<<"Read superquadric: "<<r_finitediff.toString();
+            vector<double> bounds(6),centroid(3);
+            vtk_all_points->get_polydata()->GetBounds(bounds.data());
+            for (size_t i=0; i<centroid.size(); i++)
+                centroid[i]=0.5*(bounds[i<<1]+bounds[(i<<1)+1]);
 
+            vtkSmartPointer<vtkCamera> vtk_camera=vtkSmartPointer<vtkCamera>::New();
+            vtk_camera->SetPosition(centroid[0]+1.0,centroid[1],centroid[2]+0.5);
+            vtk_camera->SetFocalPoint(centroid.data());
+            vtk_camera->SetViewUp(0.0,0.0,1.0);
+            vtk_renderer->SetActiveCamera(vtk_camera);
+
+            vtkSmartPointer<vtkInteractorStyleSwitch> vtk_style=vtkSmartPointer<vtkInteractorStyleSwitch>::New();
+            vtk_style->SetCurrentStyleToTrackballCamera();
+            vtk_renderWindowInteractor->SetInteractorStyle(vtk_style);
+            vtk_renderWindowInteractor->Start();
         }
 
-        yInfo()<<"final superquadric_finitediff parameters:"<<r_finitediff.toString(3,3);
-        unique_ptr<Superquadric> vtk_superquadric_finitediff=unique_ptr<Superquadric>(new Superquadric(r_finitediff,2.0));
+        yInfo()<<"Statistics for finite difference solutions";
+        computeStatistics(fin_diff_solutions);
+        yInfo()<<"Statistics for analytic solutions";
+        computeStatistics(analytic_solutions);
 
-        Vector r_analytic=findSuperquadric();
-        unique_ptr<Superquadric> vtk_superquadric_analytic=unique_ptr<Superquadric>(new Superquadric(r_analytic,1.2));
-
-        vtkSmartPointer<vtkRenderer> vtk_renderer=vtkSmartPointer<vtkRenderer>::New();
-        vtkSmartPointer<vtkRenderWindow> vtk_renderWindow=vtkSmartPointer<vtkRenderWindow>::New();
-        vtk_renderWindow->SetSize(300,300);
-        vtk_renderWindow->AddRenderer(vtk_renderer);
-        vtkSmartPointer<vtkRenderWindowInteractor> vtk_renderWindowInteractor=vtkSmartPointer<vtkRenderWindowInteractor>::New();
-        vtk_renderWindowInteractor->SetRenderWindow(vtk_renderWindow);
-
-        vtk_renderer->AddActor(vtk_all_points->get_actor());
-        vtk_renderer->AddActor(vtk_out_points->get_actor());
-        if (dwn_points.size()!=in_points.size())
-            vtk_renderer->AddActor(vtk_dwn_points->get_actor());
-        vtk_renderer->AddActor(vtk_superquadric_analytic->get_actor());
-        vtk_renderer->AddActor(vtk_superquadric_finitediff->get_actor());
-        vtk_renderer->SetBackground(0.1,0.2,0.2);
-
-        vtkSmartPointer<vtkAxesActor> vtk_axes=vtkSmartPointer<vtkAxesActor>::New();     
-        vtkSmartPointer<vtkOrientationMarkerWidget> vtk_widget=vtkSmartPointer<vtkOrientationMarkerWidget>::New();
-        vtk_widget->SetOutlineColor(0.9300,0.5700,0.1300);
-        vtk_widget->SetOrientationMarker(vtk_axes);
-        vtk_widget->SetInteractor(vtk_renderWindowInteractor);
-        vtk_widget->SetViewport(0.0,0.0,0.2,0.2);
-        vtk_widget->SetEnabled(1);
-        vtk_widget->InteractiveOn();
-
-        vector<double> bounds(6),centroid(3);
-        vtk_all_points->get_polydata()->GetBounds(bounds.data());
-        for (size_t i=0; i<centroid.size(); i++)
-            centroid[i]=0.5*(bounds[i<<1]+bounds[(i<<1)+1]);
-
-        vtkSmartPointer<vtkCamera> vtk_camera=vtkSmartPointer<vtkCamera>::New();
-        vtk_camera->SetPosition(centroid[0]+1.0,centroid[1],centroid[2]+0.5);
-        vtk_camera->SetFocalPoint(centroid.data());
-        vtk_camera->SetViewUp(0.0,0.0,1.0);
-        vtk_renderer->SetActiveCamera(vtk_camera);
-
-        vtkSmartPointer<vtkInteractorStyleSwitch> vtk_style=vtkSmartPointer<vtkInteractorStyleSwitch>::New();
-        vtk_style->SetCurrentStyleToTrackballCamera();
-        vtk_renderWindowInteractor->SetInteractorStyle(vtk_style);
-        vtk_renderWindowInteractor->Start();
         
         return true;
     }
