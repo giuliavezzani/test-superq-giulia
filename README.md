@@ -33,7 +33,7 @@ The option `--file_name` is the path to the file used for saving the statistics.
 ## Comparison
 In order to make the comparison fair, here is the list of parameters I used and changes I introduced:
 
-- `tol = 1e-6`
+- `tol = 1e-6` for analytic, `tol = 1e-5` for finite difference
 - `inside-penalty = 1` (parameter available only in the analytic implementation)
 - `mu_strategy = adaptive`
 - no constraints on the _z_ axis
@@ -75,5 +75,6 @@ Here are some comments to explain the results and justify the improvements obtai
 - Lower tolerance improves the results.
 - The execution time is computed as the time required by Ipopt for estimating the superquadric and not the time required by the `rpc` communication (that is bugged and needs to be re-designed).
 - Usually, superquadrics estimated with the finite difference approach are bigger.
+
 
 
