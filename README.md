@@ -36,6 +36,7 @@ In order to make the comparison fair, here is the list of parameters I used and 
 - `tol = 1e-6`
 - `inside-penalty = 1` (parameter available only in the analytic implementation)
 - `mu_strategy = adaptive`
+- no constraints on the _z_ axis
 - same initialization ([`superquadric-model`](https://github.com/robotology/superquadric-model/tree/test-finite-diff) 
 n branch `test-fin-diff` now uses the same initialization of this repo).
 
@@ -60,6 +61,19 @@ i.e. with 11 parameters).
 | Toy (FF) | 0.102369 | 0.0172055 | 0.15199 | 0.0295593 | 
 | Toy (A) | 0.109989 | 0.0105534 | 0.211006 | 0.0382253 | 
 
+
 <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/box-tol5.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/box-tol6.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/car.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/cleaner.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/toy.gif" width=150 height=150>
+
+Superquadrics computed with finite difference approach are rendered with green color.
+
+## Comments
+Here are some comments to explain the results and justify the improvements obtained for finite difference implementation:
+
+- The new initialization used is much better. Main differences:
+  - centroid is now computed from bounding boxes and now as baricenter of the point cloud.
+  - `initial orientation = 0.0 0.0 0.0`.
+- Lower tolerance improves the results.
+- The execution time is computed as the time required by Ipopt for estimating the superquadric and not the time required by the `rpc` communication (that is bugged and needs to be re-designed).
+- Usually, superquadrics estimated with the finite difference approach are bigger.
 
 
