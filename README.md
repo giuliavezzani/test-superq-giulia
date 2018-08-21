@@ -16,7 +16,7 @@ This code is derived from [`test-superq`](https://gist.github.com/pattacini/4eb6
 - launch `superquadric-model --from config-classes-fixed.ini`
 - launch `test-superquadric  --file path-to-pointcloud-file --trials <num_trials> --visualize <0 or 1> --file_name path-to-saving-file`
 
-The file `config-classes.ini` is available
+The file `config-classes-fixed.ini` is available
 [here](https://github.com/robotology/superquadric-model/blob/test-finite-diff/app/conf/config-classes-fixed.ini). 
 
 
