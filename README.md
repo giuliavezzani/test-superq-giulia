@@ -36,6 +36,7 @@ In order to make the comparison fair, here is the list of parameters I used and 
 - `tol = 1e-6` for analytic, `tol = 1e-5` for finite difference
 - `inside-penalty = 1` (parameter available only in the analytic implementation)
 - `mu_strategy = adaptive`
+- `sample = 50`
 - no constraints on the _z_ axis
 - same initialization ([`superquadric-model`](https://github.com/robotology/superquadric-model/tree/test-finite-diff) 
 on branch `test-fin-diff` now uses the same initialization of this repo).
