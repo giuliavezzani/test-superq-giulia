@@ -182,11 +182,9 @@ public:
         vtk_transform=vtkSmartPointer<vtkTransform>::New();
         vtk_transform->Translate(r.subVector(0,2).data());
         vtk_transform->RotateWXYZ((180.0/M_PI)*r[6],r.subVector(3,5).data());
-        //vtk_transform->RotateZ((180.0/M_PI)*r[6]);
         vtk_actor->SetUserTransform(vtk_transform);
     }
 };
-
 
 /****************************************************************/
 class Finder : public RFModule
@@ -197,6 +195,9 @@ class Finder : public RFModule
     bool test_derivative;
     double inside_penalty;
     bool visualize;
+
+    ofstream fout;
+    string file_name;
 
     vector<Vector> all_points,in_points,out_points,dwn_points;
     vector<vector<unsigned char>> all_colors;
@@ -346,9 +347,7 @@ class Finder : public RFModule
 
                  superq_aux[8]=dim->get(0).asDouble(); superq_aux[9]=dim->get(1).asDouble(); superq_aux[10]=dim->get(2).asDouble(); superq_aux[11]=dim->get(3).asDouble();
             }
-
         }
-
 
         return superq_aux;
     }
@@ -358,8 +357,10 @@ class Finder : public RFModule
     {
         double error_mean=0.0;
         double error_std=0.0;
+
         double time_mean=0.0;
         double time_std=0.0;
+
         vector<double> errors;
 
         for (auto &i:solutions)
@@ -367,11 +368,9 @@ class Finder : public RFModule
             errors.push_back(superqPointsDistance(i));
         }
 
-        //for (auto &i:errors)
-        //   yDebug()<<"Errors "<<i;
-
         error_mean = accumulate(errors.begin(), errors.end(), 0.0) / errors.size();
         time_mean = accumulate(times.begin(), times.end(), 0.0) / times.size();
+
         for (auto &i:errors)
         {
             double diff = i - error_mean;
@@ -394,7 +393,14 @@ class Finder : public RFModule
         yInfo()<<"     Average time: "<<time_mean;
         yInfo()<<"     Standard deviation: "<<time_std;
 
+        if (fout.is_open())
+        {
+            fout<<"     Average error: "<<error_mean<<endl;
+            fout<<"     Standard deviation: "<<error_std<<endl;
 
+            fout<<"     Average time: "<<time_mean<<endl;
+            fout<<"     Standard deviation: "<<time_std<<endl;
+        }
     }
 
     /****************************************************************/
@@ -403,7 +409,6 @@ class Finder : public RFModule
 
         Vector rot = x.subVector(3,6);
         Vector c = x.subVector(0,2);
-
 
         Matrix T=axis2dcm(rot);
         T.setSubcol(c,0,3);
@@ -424,7 +429,6 @@ class Finder : public RFModule
         }
 
         return value/=dwn_points.size();
-
     }
 
     /****************************************************************/
@@ -504,10 +508,11 @@ class Finder : public RFModule
         test_derivative=rf.check("test-derivative");
         visualize=rf.check("visualize", Value(1)).asBool();
 
+        file_name=rf.check("file_name", Value("../statistics.txt")).asString();
+
         removeOutliers();
 
         // Compute several superquadrics for statistics
-
         vtkSmartPointer<vtkRenderer> vtk_renderer=vtkSmartPointer<vtkRenderer>::New();
         vtkSmartPointer<vtkRenderWindow> vtk_renderWindow=vtkSmartPointer<vtkRenderWindow>::New();
         vtkSmartPointer<vtkRenderWindowInteractor> vtk_renderWindowInteractor=vtkSmartPointer<vtkRenderWindowInteractor>::New();
@@ -521,7 +526,6 @@ class Finder : public RFModule
         for (auto t=0; t < trials; t++)
         {
             sampleInliers();
-
 
             vtk_all_points=unique_ptr<Points>(new Points(all_points,2));
             vtk_out_points=unique_ptr<Points>(new Points(out_points,4));
@@ -587,9 +591,6 @@ class Finder : public RFModule
                 cmd.addString("get_superq");
                 superqRpc.write(cmd, superq_b);
 
-
-
-
                 Vector v;
                 v = getBottle(superq_b);
                 r_finitediff.resize(12,0.0);
@@ -618,12 +619,8 @@ class Finder : public RFModule
                     if (group->get(0).asString() == "average_computation_time")
                     {
                          times_fin_diff.push_back(group->get(1).asDouble());
-
-
                     }
                 }
-                yInfo()<<"Received superquadric: "<<times_fin_diff;
-
             }
 
             yInfo()<<"Superquadric computed with finite difference: ";
@@ -638,11 +635,8 @@ class Finder : public RFModule
 
             analytic_solutions.push_back(r_analytic);
 
-            //vtkSmartPointer<vtkRenderer> vtk_renderer=vtkSmartPointer<vtkRenderer>::New();
-            //vtkSmartPointer<vtkRenderWindow> vtk_renderWindow=vtkSmartPointer<vtkRenderWindow>::New();
             vtk_renderWindow->SetSize(300,300);
             vtk_renderWindow->AddRenderer(vtk_renderer);
-            //vtkSmartPointer<vtkRenderWindowInteractor> vtk_renderWindowInteractor=vtkSmartPointer<vtkRenderWindowInteractor>::New();
             vtk_renderWindowInteractor->SetRenderWindow(vtk_renderWindow);
 
             vtk_renderer->AddActor(vtk_all_points->get_actor());
@@ -653,8 +647,6 @@ class Finder : public RFModule
             vtk_renderer->AddActor(vtk_superquadric_finitediff->get_actor());
             vtk_renderer->SetBackground(0.1,0.2,0.2);
 
-            //vtkSmartPointer<vtkAxesActor> vtk_axes=vtkSmartPointer<vtkAxesActor>::New();
-            //vtkSmartPointer<vtkOrientationMarkerWidget> vtk_widget=vtkSmartPointer<vtkOrientationMarkerWidget>::New();
             vtk_widget->SetOutlineColor(0.9300,0.5700,0.1300);
             vtk_widget->SetOrientationMarker(vtk_axes);
             vtk_widget->SetInteractor(vtk_renderWindowInteractor);
@@ -667,18 +659,14 @@ class Finder : public RFModule
             for (size_t i=0; i<centroid.size(); i++)
                 centroid[i]=0.5*(bounds[i<<1]+bounds[(i<<1)+1]);
 
-            //vtkSmartPointer<vtkCamera> vtk_camera=vtkSmartPointer<vtkCamera>::New();
             vtk_camera->SetPosition(centroid[0]+1.0,centroid[1],centroid[2]+0.5);
             vtk_camera->SetFocalPoint(centroid.data());
             vtk_camera->SetViewUp(0.0,0.0,1.0);
             vtk_renderer->SetActiveCamera(vtk_camera);
 
-            //vtkSmartPointer<vtkInteractorStyleSwitch> vtk_style=vtkSmartPointer<vtkInteractorStyleSwitch>::New();
             vtk_style->SetCurrentStyleToTrackballCamera();
             vtk_renderWindowInteractor->SetInteractorStyle(vtk_style);
 
-            //if (visualize)
-            //    vtk_renderWindowInteractor->Start();
         }
 
         yInfo()<<"Statistics for finite difference solutions";
@@ -686,8 +674,6 @@ class Finder : public RFModule
         yInfo()<<"Statistics for analytic solutions";
         computeStatistics(analytic_solutions, times_analytic);
         yInfo()<<"Statistics for analytic computed with cost function";
-
-        //yDebug()<<"Errors with z "<<errors_z;
 
         double error_z = accumulate(errors_z.begin(), errors_z.end(), 0.0) / errors_z.size();
 
@@ -706,7 +692,32 @@ class Finder : public RFModule
         if (visualize)
             vtk_renderWindowInteractor->Start();
 
-        
+        //ofstream fout;
+        fout.open(file_name.c_str());
+        if (fout.is_open())
+        {
+            fout<<"Statistics for finite difference solutions"<<endl;
+            computeStatistics(fin_diff_solutions, times_fin_diff);
+            fout<<endl<<"Statistics for analytic solutions"<<endl;
+            computeStatistics(analytic_solutions, times_analytic);
+            fout<<"Statistics for analytic computed with cost function"<<endl;
+
+            double error_z = accumulate(errors_z.begin(), errors_z.end(), 0.0) / errors_z.size();
+
+            double error_z_std = 0.0;
+            for (auto &i:errors_z)
+            {
+                double diff = i - error_z;
+                error_z_std += diff * diff;
+            }
+
+            error_z_std = sqrt(error_z_std/errors_z.size());
+
+            fout<<"     Average error: "<<error_z<<endl;
+            fout<<"     Standard deviation: "<<error_z_std<<endl;
+        }
+        fout.close();
+
         return true;
     }
 
