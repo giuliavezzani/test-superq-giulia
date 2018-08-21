@@ -38,11 +38,11 @@ In order to make the comparison fair, here is the list of parameters I used and 
 - `mu_strategy = adaptive`
 - no constraints on the _z_ axis
 - same initialization ([`superquadric-model`](https://github.com/robotology/superquadric-model/tree/test-finite-diff) 
-n branch `test-fin-diff` now uses the same initialization of this repo).
+on branch `test-fin-diff` now uses the same initialization of this repo).
 
 Quantity analyzed:
 - `average error`*
-- `standard devition of error`
+- `standard deviation of error`
 - `average execution time`
 - `standard deviation of execution time`
 
