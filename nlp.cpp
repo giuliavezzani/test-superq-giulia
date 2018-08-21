@@ -78,10 +78,6 @@ bool SuperQuadricNLP::get_starting_point(Ipopt::Index n, bool init_x,
     x[7]=1.0;
     x[8]=1.0;
 
-
-
-    yInfo()<<"Initial x0"<<x[0]<<x[1]<<x[2]<<x[3]<<x[4]<<x[5]<<x[6]<<x[7]<<x[8];
-
     return true;
 }
 

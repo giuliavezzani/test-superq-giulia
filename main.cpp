@@ -206,6 +206,8 @@ class Finder : public RFModule
 
     vector<double> times_analytic;
     vector<double> times_fin_diff;
+
+    vector<double> errors_z;
     
     unique_ptr<Points> vtk_all_points,vtk_out_points,vtk_dwn_points;
     
@@ -288,7 +290,7 @@ class Finder : public RFModule
         double t1=Time::now();
 
         Vector r=nlp->get_result();
-        yDebug()<<"Error computed only with z angle: "<<nlp->final_cost;
+        errors_z.push_back(nlp->final_cost);
 
         yInfo()<<"center   = ("<<r.subVector(0,2).toString(3,3)<<")";
         yInfo()<<"angle    ="<<r[3]<<"[deg]";
@@ -366,7 +368,7 @@ class Finder : public RFModule
         }
 
         //for (auto &i:errors)
-        //    yDebug()<<"Errors "<<i;
+        //   yDebug()<<"Errors "<<i;
 
         error_mean = accumulate(errors.begin(), errors.end(), 0.0) / errors.size();
         time_mean = accumulate(times.begin(), times.end(), 0.0) / times.size();
@@ -399,20 +401,25 @@ class Finder : public RFModule
     double superqPointsDistance(Vector &x)
     {
 
-        Matrix R=axis2dcm(x.subVector(3,6));
+        Vector rot = x.subVector(3,6);
+        Vector c = x.subVector(0,2);
 
-        R = R.transposed();
+
+        Matrix T=axis2dcm(rot);
+        T.setSubcol(c,0,3);
+        T=SE3inv(T);
 
         double value=0.0;
+        Vector p1(4,1.0);
 
         for(auto &point_cloud:dwn_points)
         {
-            double num1 = R(0, 0)*point_cloud[0] + R(0, 1)*point_cloud[1] + R(0, 2)*point_cloud[2] - x[0] * R(0, 0) - x[1] * R(0, 1) - x[2] * R(0, 2);
-            double num2 = R(1, 0)*point_cloud[0] + R(1, 1)*point_cloud[1] + R(1, 2)*point_cloud[2] - x[0] * R(1, 0) - x[1] * R(1, 1) - x[2] * R(1, 2);
-            double num3 = R(2, 0)*point_cloud[0] + R(2, 1)*point_cloud[1] + R(2, 2)*point_cloud[2] - x[0] * R(2, 0) - x[1] * R(2, 1) - x[2] * R(2, 2);
-            double tmp = pow(abs(num1 / x[7]), 2.0 / x[11]) + pow(abs(num2 / x[8]), 2.0 / x[11]);
-            tmp = pow(abs(tmp), x[11] / x[10]) + pow(abs(num3 / x[9]), (2.0 / x[10]));
-            tmp = pow(tmp,x[10])-1;
+            p1.setSubvector(0,point_cloud);
+            p1=T*p1;
+            double tmp1 = pow(abs(p1[0] / x[7]), 2.0 / x[11]);
+            double tmp2 = pow(abs(p1[1] / x[8]), 2.0 / x[11]);
+            double tmp3 = pow(abs(p1[2] / x[9]), 2.0 / x[10]);
+            double tmp = pow(pow(tmp1+tmp2,x[11]/x[10])+tmp3,x[10])-1.0;
             value+=tmp*tmp;
         }
 
@@ -492,7 +499,7 @@ class Finder : public RFModule
                 outliersRemovalOptions=*ptr;
 
         sample=(unsigned int)rf.check("sample",Value(50)).asInt();
-        inside_penalty=rf.check("inside-penalty",Value(100.0)).asDouble();
+        inside_penalty=rf.check("inside-penalty",Value(1.0)).asDouble();
         trials=(unsigned int)rf.check("trials",Value(1)).asInt();
         test_derivative=rf.check("test-derivative");
         visualize=rf.check("visualize", Value(1)).asBool();
@@ -500,6 +507,16 @@ class Finder : public RFModule
         removeOutliers();
 
         // Compute several superquadrics for statistics
+
+        vtkSmartPointer<vtkRenderer> vtk_renderer=vtkSmartPointer<vtkRenderer>::New();
+        vtkSmartPointer<vtkRenderWindow> vtk_renderWindow=vtkSmartPointer<vtkRenderWindow>::New();
+        vtkSmartPointer<vtkRenderWindowInteractor> vtk_renderWindowInteractor=vtkSmartPointer<vtkRenderWindowInteractor>::New();
+
+        vtkSmartPointer<vtkAxesActor> vtk_axes=vtkSmartPointer<vtkAxesActor>::New();
+        vtkSmartPointer<vtkOrientationMarkerWidget> vtk_widget=vtkSmartPointer<vtkOrientationMarkerWidget>::New();
+
+        vtkSmartPointer<vtkCamera> vtk_camera=vtkSmartPointer<vtkCamera>::New();
+        vtkSmartPointer<vtkInteractorStyleSwitch> vtk_style=vtkSmartPointer<vtkInteractorStyleSwitch>::New();
 
         for (auto t=0; t < trials; t++)
         {
@@ -512,12 +529,13 @@ class Finder : public RFModule
 
             vtk_all_points->set_colors(all_colors);
             vtk_out_points->get_actor()->GetProperty()->SetColor(1.0,0.0,0.0);
-            vtk_dwn_points->get_actor()->GetProperty()->SetColor(1.0,1.0,0.0);
+            vtk_dwn_points->get_actor()->GetProperty()->SetColor(1.0,0.0,0.0);
+
+            vtk_dwn_points->get_actor()->GetProperty()->SetPointSize(5);
 
             Bottle &oBottle=oPort.prepare();
             oBottle.clear();
             Bottle &payLoad=oBottle.addList();
-
 
 
             Vector r_finitediff;
@@ -609,10 +627,10 @@ class Finder : public RFModule
             }
 
             yInfo()<<"Superquadric computed with finite difference: ";
-            yInfo()<<"center "<<r_finitediff.subVector(0,2).toString(3,3);
-            yInfo()<<"orientation "<<r_finitediff.subVector(3,6).toString(3,3);
-            yInfo()<<"dimensions "<<r_finitediff.subVector(7,9).toString(3,3);
-            yInfo()<<"shape "<<r_finitediff.subVector(10,11).toString(3,3);
+            yInfo()<<"center ("<<r_finitediff.subVector(0,2).toString(3,3)<< ")";
+            yInfo()<<"orientation ("<<r_finitediff.subVector(3,6).toString(3,3)<< ")";
+            yInfo()<<"dimensions ("<<r_finitediff.subVector(7,9).toString(3,3)<< ")";
+            yInfo()<<"shape ("<<r_finitediff.subVector(10,11).toString(3,3)<< ")";
             unique_ptr<Superquadric> vtk_superquadric_finitediff=unique_ptr<Superquadric>(new Superquadric(r_finitediff,2.0));
 
             Vector r_analytic=findSuperquadric();
@@ -620,11 +638,11 @@ class Finder : public RFModule
 
             analytic_solutions.push_back(r_analytic);
 
-            vtkSmartPointer<vtkRenderer> vtk_renderer=vtkSmartPointer<vtkRenderer>::New();
-            vtkSmartPointer<vtkRenderWindow> vtk_renderWindow=vtkSmartPointer<vtkRenderWindow>::New();
+            //vtkSmartPointer<vtkRenderer> vtk_renderer=vtkSmartPointer<vtkRenderer>::New();
+            //vtkSmartPointer<vtkRenderWindow> vtk_renderWindow=vtkSmartPointer<vtkRenderWindow>::New();
             vtk_renderWindow->SetSize(300,300);
             vtk_renderWindow->AddRenderer(vtk_renderer);
-            vtkSmartPointer<vtkRenderWindowInteractor> vtk_renderWindowInteractor=vtkSmartPointer<vtkRenderWindowInteractor>::New();
+            //vtkSmartPointer<vtkRenderWindowInteractor> vtk_renderWindowInteractor=vtkSmartPointer<vtkRenderWindowInteractor>::New();
             vtk_renderWindowInteractor->SetRenderWindow(vtk_renderWindow);
 
             vtk_renderer->AddActor(vtk_all_points->get_actor());
@@ -635,8 +653,8 @@ class Finder : public RFModule
             vtk_renderer->AddActor(vtk_superquadric_finitediff->get_actor());
             vtk_renderer->SetBackground(0.1,0.2,0.2);
 
-            vtkSmartPointer<vtkAxesActor> vtk_axes=vtkSmartPointer<vtkAxesActor>::New();
-            vtkSmartPointer<vtkOrientationMarkerWidget> vtk_widget=vtkSmartPointer<vtkOrientationMarkerWidget>::New();
+            //vtkSmartPointer<vtkAxesActor> vtk_axes=vtkSmartPointer<vtkAxesActor>::New();
+            //vtkSmartPointer<vtkOrientationMarkerWidget> vtk_widget=vtkSmartPointer<vtkOrientationMarkerWidget>::New();
             vtk_widget->SetOutlineColor(0.9300,0.5700,0.1300);
             vtk_widget->SetOrientationMarker(vtk_axes);
             vtk_widget->SetInteractor(vtk_renderWindowInteractor);
@@ -649,24 +667,44 @@ class Finder : public RFModule
             for (size_t i=0; i<centroid.size(); i++)
                 centroid[i]=0.5*(bounds[i<<1]+bounds[(i<<1)+1]);
 
-            vtkSmartPointer<vtkCamera> vtk_camera=vtkSmartPointer<vtkCamera>::New();
+            //vtkSmartPointer<vtkCamera> vtk_camera=vtkSmartPointer<vtkCamera>::New();
             vtk_camera->SetPosition(centroid[0]+1.0,centroid[1],centroid[2]+0.5);
             vtk_camera->SetFocalPoint(centroid.data());
             vtk_camera->SetViewUp(0.0,0.0,1.0);
             vtk_renderer->SetActiveCamera(vtk_camera);
 
-            vtkSmartPointer<vtkInteractorStyleSwitch> vtk_style=vtkSmartPointer<vtkInteractorStyleSwitch>::New();
+            //vtkSmartPointer<vtkInteractorStyleSwitch> vtk_style=vtkSmartPointer<vtkInteractorStyleSwitch>::New();
             vtk_style->SetCurrentStyleToTrackballCamera();
             vtk_renderWindowInteractor->SetInteractorStyle(vtk_style);
 
-            if (visualize)
-                vtk_renderWindowInteractor->Start();
+            //if (visualize)
+            //    vtk_renderWindowInteractor->Start();
         }
 
         yInfo()<<"Statistics for finite difference solutions";
         computeStatistics(fin_diff_solutions, times_fin_diff);
         yInfo()<<"Statistics for analytic solutions";
         computeStatistics(analytic_solutions, times_analytic);
+        yInfo()<<"Statistics for analytic computed with cost function";
+
+        //yDebug()<<"Errors with z "<<errors_z;
+
+        double error_z = accumulate(errors_z.begin(), errors_z.end(), 0.0) / errors_z.size();
+
+        double error_z_std = 0.0;
+        for (auto &i:errors_z)
+        {
+            double diff = i - error_z;
+            error_z_std += diff * diff;
+        }
+
+        error_z_std = sqrt(error_z_std/errors_z.size());
+
+        yInfo()<<"     Average error: "<<error_z;
+        yInfo()<<"     Standard deviation: "<<error_z_std;
+
+        if (visualize)
+            vtk_renderWindowInteractor->Start();
 
         
         return true;
