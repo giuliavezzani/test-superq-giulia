@@ -51,8 +51,6 @@ i.e. with 11 parameters).
 ## Results
 | Object | Average error | Std error | Average time | Std time | 
 | --- | --- | --- | --- | --- |
-| Toy (FF) | 0.102369 | 0.0172055 | 0.15199 | 0.0295593 | 
-| Toy (A) | 0.109989 | 0.0105534 | 0.211006 | 0.0382253 | 
 | Box (FF tol=1e-5/ tol=1e-6) | 0.0847043 / 0.0214944 | 0.0493931 / 0.0068388| 0.105396 / 0.167901 | 0.0254845 / 0.0253024| 
 | Box (A) | 0.0321511 | 0.0109134 | 0.12648 | 0.0352853 | 
 | Car (FF) | 0.0384336 | 0.00811573 | 0.101143 | 0.0202455 | 
@@ -62,6 +60,6 @@ i.e. with 11 parameters).
 | Toy (FF) | 0.102369 | 0.0172055 | 0.15199 | 0.0295593 | 
 | Toy (A) | 0.109989 | 0.0105534 | 0.211006 | 0.0382253 | 
 
-
+<img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/box-tol5.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/box-tol6.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/car.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/cleaner.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/toy.gif" width=150 height=150>
 
 
