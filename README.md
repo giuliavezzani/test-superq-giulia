@@ -72,7 +72,7 @@ Here are some comments to explain the results and justify the improvements obtai
 
 - The new initialization used is much better. Main differences:
   - centroid is now computed from bounding boxes and not as baricenter of the point cloud.
-  - `initial orientation = 0.0 0.0 0.0`.
+  - `initial orientation = 0.0 0.0 0.0` (**Note** after more tests, we noticed that actually also using an estimate of initial orientation works well)
 - Lower tolerance improves the results.
 - The execution time is computed as the time required by Ipopt for estimating the superquadric and not the time required by the `rpc` communication (that is bugged and needs to be re-designed).
 - Usually, superquadrics estimated with the finite difference approach are bigger.
