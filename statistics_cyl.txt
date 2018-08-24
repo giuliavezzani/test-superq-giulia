@@ -1,0 +1,14 @@
+Statistics for finite difference solutions
+     Average error: 0.0492657
+     Standard deviation: 0.00755667
+     Average time: 0.144541
+     Standard deviation: 0.00766444
+
+Statistics for analytic solutions
+     Average error: 0.0501472
+     Standard deviation: 0.00742738
+     Average time: 0.190111
+     Standard deviation: 0.0607793
+Statistics for analytic computed with cost function
+     Average error: 0.0375557
+     Standard deviation: 0.00702602
