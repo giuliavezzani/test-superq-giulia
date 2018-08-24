@@ -72,15 +72,15 @@ Superquadrics computed with finite difference approach are rendered with green c
 ## Comments
 Here are some comments to explain the results and justify the improvements obtained for finite difference implementation:
 
-- centroid is now computed from bounding boxes and not as baricenter of the point cloud.
-- `initial orientation = 0.0 0.0 0.0` 
+- The initial centroid is now computed from bounding boxes and not as baricenter of the point cloud.
+- The `initial orientation = 0.0 0.0 0.0` 
 - Lower tolerance improves the results.
 - The execution time is computed as the time required by Ipopt for estimating the superquadric and not the time required by the `rpc` communication (that is bugged and needs to be re-designed).
 - Usually, superquadrics estimated with the finite difference approach are bigger.
 
 ## Initial orientation
 We also performed some tests providing the  finite-difference optimizer also an initial orientation, computed from the point cloud.
-The performance are basically the same, but we manage to improve the box models also using `tol=1e-5`, as show in the following gif.
+The performance is basically the same, but we manage to get good box models also using `tol=1e-5`, as show in the following gif.
 
 <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/box-init-tol5.gif" width=150 height=150>
 
