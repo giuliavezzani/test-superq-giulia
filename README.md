@@ -65,7 +65,7 @@ i.e. with 11 parameters).
 | Cylinder (A) | 0.0385133 | 0.00978839 | 0.161722 | 0.0279027 | 
 
 
-<img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/box-tol5.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/box-tol6.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/car.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/cleaner.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/toy.gif" width=150 height=150>
+<img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/box-tol5.gif" width=130 height=130> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/box-tol6.gif" width=130 height=130> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/car.gif" width=130 height=130> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/cleaner.gif" width=130 height=130> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/toy.gif" width=130 height=130>  <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/cyl.gif" width=130 height=130>
 
 Superquadrics computed with finite difference approach are rendered with green color.
 
@@ -82,7 +82,7 @@ Here are some comments to explain the results and justify the improvements obtai
 We also performed some tests providing the  finite-difference optimizer also an initial orientation, computed from the point cloud.
 The performance are basically the same, but we manage to improve the box models also using `tol=1e-5`, as show in the following gif.
 
-
+<img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/box-init-tol5.gif" width=150 height=150>
 
 
 
