@@ -31,10 +31,10 @@ The option `--visualize` is used to enable/disable the visualization of the esti
 The option `--file_name` is the path to the file used for saving the statistics.
 
 ## Comparison
-In order to make the comparison fair, here is the list of parameters I used and changes I introduced:
+Here is the list of parameters I used and changes I introduced:
 
 - `tol = 1e-6` for analytic, `tol = 1e-5` for finite difference
-- `inside-penalty = 1` (parameter available only in the analytic implementation)
+- `inside-penalty = 1` (parameter available only in the **analytic** implementation)
 - `mu_strategy = adaptive`
 - `sample = 50`
 - no constraints on the _z_ axis
@@ -53,7 +53,7 @@ i.e. with 11 parameters).
 ## Results
 | Object | Average error | Std error | Average time | Std time | 
 | --- | --- | --- | --- | --- |
-| Box (FF tol=1e-5/ tol=1e-6) | 0.0847043 / 0.0214944 | 0.0493931 / 0.0068388| 0.105396 / 0.167901 | 0.0254845 / 0.0253024| 
+| Box (FF tol=1e-5/ **tol=1e-6**) | 0.0847043 / 0.0214944 | 0.0493931 / 0.0068388| 0.105396 / 0.167901 | 0.0254845 / 0.0253024| 
 | Box (A) | 0.0321511 | 0.0109134 | 0.12648 | 0.0352853 | 
 | Car (FF) | 0.0384336 | 0.00811573 | 0.101143 | 0.0202455 | 
 | Car (A) | 0.126919 | 0.0497111 | 0.1537 | 0.0547847 | 
@@ -61,6 +61,8 @@ i.e. with 11 parameters).
 | Cleaner (A) | 0.0779995 | 0.0821701 | 0.211987 | 0.0547847 | 
 | Toy (FF) | 0.102369 | 0.0172055 | 0.15199 | 0.0295593 | 
 | Toy (A) | 0.109989 | 0.0105534 | 0.211006 | 0.0382253 | 
+| Cylinder (FF) | 0.0543583 | 0.0182203 | 0.111832 | 0.033627 | 
+| Cylinder (A) | 0.0385133 | 0.00978839 | 0.161722 | 0.0279027 | 
 
 
 <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/box-tol5.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/box-tol6.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/car.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/cleaner.gif" width=150 height=150> <img src="https://github.com/giuliavezzani/test-superq-giulia/blob/master/misc/toy.gif" width=150 height=150>
@@ -70,12 +72,17 @@ Superquadrics computed with finite difference approach are rendered with green c
 ## Comments
 Here are some comments to explain the results and justify the improvements obtained for finite difference implementation:
 
-- The new initialization used is much better. Main differences:
-  - centroid is now computed from bounding boxes and not as baricenter of the point cloud.
-  - `initial orientation = 0.0 0.0 0.0` (**Note** after more tests, we noticed that actually also using an estimate of initial orientation works well)
+- centroid is now computed from bounding boxes and not as baricenter of the point cloud.
+- `initial orientation = 0.0 0.0 0.0` 
 - Lower tolerance improves the results.
 - The execution time is computed as the time required by Ipopt for estimating the superquadric and not the time required by the `rpc` communication (that is bugged and needs to be re-designed).
 - Usually, superquadrics estimated with the finite difference approach are bigger.
+
+## Initial orientation
+We also performed some tests providing the  finite-difference optimizer also an initial orientation, computed from the point cloud.
+The performance are basically the same, but we manage to improve the box models also using `tol=1e-5`, as show in the following gif.
+
+
 
 
 
